@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>学生首页 - 航天知识闯关</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background: #1b263b; 
+            color: #e0e1dd; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card { 
+            background: rgba(255,255,255,0.08); 
+            border: 1px solid rgba(255,255,255,0.15); 
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        .card:hover { 
+            box-shadow: 0 6px 24px rgba(61, 90, 128, 0.25);
+            transform: translateY(-2px);
+        }
+        .nav-pills .nav-link { 
+            color: #adb5bd; 
+            transition: all 0.3s ease;
+        }
+        .nav-pills .nav-link:hover { 
+            color: #e0e1dd;
+        }
+        .nav-pills .nav-link.active { 
+            background: #3d5a80; 
+            box-shadow: 0 2px 8px rgba(61, 90, 128, 0.3);
+        }
+        .btn-outline-light { 
+            border-color: rgba(255,255,255,0.3); 
+            color: #e0e1dd; 
+            transition: all 0.3s ease;
+        }
+        .btn-outline-light:hover { 
+            background: rgba(255,255,255,0.1); 
+            border-color: #4a6fa5;
+            color: #e0e1dd;
+        }
+        .form-select { 
+            background: rgba(255,255,255,0.1); 
+            border: 1px solid rgba(255,255,255,0.2); 
+            color: #e0e1dd;
+        }
+        .form-select:focus { 
+            background: rgba(255,255,255,0.15); 
+            border-color: #4a6fa5; 
+            box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.25);
+        }
+        h5 { 
+            color: #e0e1dd; 
+            font-weight: 600;
+        }
+        a { 
+            color: #4a6fa5; 
+            transition: color 0.3s ease;
+        }
+        a:hover { 
+            color: #98c1d9; 
+        }
+        .navbar { 
+            background: rgba(13, 27, 42, 0.95); 
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">航天知识闯关</span>
+            <span class="text-light" id="userName"></span>
+            <a class="btn btn-outline-light btn-sm" href="../login.html" onclick="localStorage.clear()">退出</a>
+        </div>
+    </nav>
+    <div class="container py-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card p-3 mb-3">
+                    <h5>我的关卡</h5>
+                    <p class="text-muted">选择年级后查看关卡列表</p>
+                    <select class="form-select w-auto" id="gradeSelect"></select>
+                    <div class="mt-3" id="levelList"></div>
+                </div>
+                <div class="card p-3">
+                    <h5>今日推荐</h5>
+                    <div id="recommendList"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 mb-3">
+                    <h5>进度概览</h5>
+                    <p class="mb-0">已通过关卡：<strong id="passedCount">0</strong></p>
+                </div>
+                <div class="card p-3 mb-3">
+                    <a href="wrong.html" class="btn btn-outline-light w-100">错题本</a>
+                </div>
+                <div class="card p-3">
+                    <h5>勋章</h5>
+                    <div id="badgeList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.origin + '/space-knowledge/api';
+        const token = localStorage.getItem('token');
+        if (!token) { location.href = '../login.html'; }
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        document.getElementById('userName').textContent = user.realName || user.username || '';
+
+        function authHeaders() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+
+        // 统一获取所有数据，减少HTTP请求
+        async function loadAllData() {
+            try {
+                // 并行请求所有数据
+                const [gradesRes, dashboardRes, badgesRes] = await Promise.all([
+                    fetch(API_BASE + '/grades', { headers: authHeaders() }),
+                    fetch(API_BASE + '/student/dashboard', { headers: authHeaders() }),
+                    fetch(API_BASE + '/student/badges', { headers: authHeaders() })
+                ]);
+                
+                // 检查响应状态
+                if (!gradesRes.ok || !dashboardRes.ok || !badgesRes.ok) {
+                    throw new Error('网络请求失败');
+                }
+                
+                // 解析响应数据
+                const [gradesData, dashboardData, badgesData] = await Promise.all([
+                    gradesRes.json(),
+                    dashboardRes.json(),
+                    badgesRes.json()
+                ]);
+                
+                // 处理年级数据
+                if (gradesData.code === 200 && gradesData.data) {
+                    const sel = document.getElementById('gradeSelect');
+                    sel.innerHTML = ''; // 清空现有选项
+                    
+                    // 只显示用户自己的年级
+                    if (user.gradeId) {
+                        const userGrade = gradesData.data.find(g => g.id == user.gradeId);
+                        if (userGrade) {
+                            const option = document.createElement('option');
+                            option.value = userGrade.id;
+                            option.textContent = userGrade.name;
+                            sel.appendChild(option);
+                        }
+                    }
+                    
+                    sel.onchange = loadLevels;
+                    if (user.gradeId) sel.value = user.gradeId;
+                    loadLevels();
+                }
+                
+                // 处理仪表板数据
+                if (dashboardData.code === 200 && dashboardData.data) {
+                    document.getElementById('passedCount').textContent = dashboardData.data.passedLevels || 0;
+                    const rec = dashboardData.data.recommend || [];
+                    const recommendList = document.getElementById('recommendList');
+                    if (rec.length) {
+                        recommendList.innerHTML = rec.slice(0, 5).map(q => 
+                            `<div class="mb-2"><a href="practice.html?qid=${q.id}" class="text-light">${(q.content || '').substring(0, 60)}…</a></div>`
+                        ).join('');
+                    } else {
+                        recommendList.innerHTML = '<p class="text-muted">暂无推荐</p>';
+                    }
+                }
+                
+                // 处理勋章数据
+                if (badgesData.code === 200 && badgesData.data && badgesData.data.length) {
+                    document.getElementById('badgeList').innerHTML = badgesData.data.map(b => 
+                        `<span class="badge bg-secondary me-1" title="${b.description}">${b.name}</span>`
+                    ).join('');
+                } else {
+                    document.getElementById('badgeList').innerHTML = '<p class="text-muted small">暂无勋章</p>';
+                }
+                
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                // 显示错误提示
+                document.getElementById('levelList').innerHTML = '<p class="text-danger">加载失败，请刷新重试</p>';
+            }
+        }
+
+        function loadLevels() {
+            const gradeId = document.getElementById('gradeSelect').value;
+            const levelList = document.getElementById('levelList');
+            if (!gradeId) {
+                levelList.innerHTML = '<p class="text-muted">选择年级后查看关卡列表</p>';
+                return;
+            }
+            
+            // 显示加载状态
+            levelList.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+            
+            fetch(API_BASE + '/student/levels?gradeId=' + gradeId, { headers: authHeaders() })
+                .then(r => {
+                    if (!r.ok) throw new Error('网络错误');
+                    return r.json();
+                })
+                .then(d => {
+                    if (d.code !== 200) {
+                        levelList.innerHTML = '<p class="text-danger">' + (d.message || '加载失败') + '</p>';
+                        return;
+                    }
+                    
+                    if (!d.data || !d.data.length) {
+                        levelList.innerHTML = '<p class="text-muted">暂无关卡</p>';
+                        return;
+                    }
+                    
+                    // 优化DOM操作，减少重排
+                    const fragment = document.createDocumentFragment();
+                    d.data.forEach(l => {
+                        const link = document.createElement('a');
+                        link.href = `level.html?id=${l.id}`;
+                        link.className = 'btn btn-outline-light me-2 mb-2';
+                        link.textContent = l.name;
+                        fragment.appendChild(link);
+                    });
+                    levelList.innerHTML = '';
+                    levelList.appendChild(fragment);
+                })
+                .catch(err => {
+                    console.error('加载关卡失败:', err);
+                    levelList.innerHTML = '<p class="text-danger">加载失败，请刷新重试</p>';
+                });
+        }
+
+        // 加载所有数据
+        loadAllData();
+    </script>
+</body>
+</html>

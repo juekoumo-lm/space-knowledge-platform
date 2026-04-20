@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.StatisticsMapper">
+    <select id="levelPassRateByGrade" resultType="map">
+        SELECT l.id AS levelId, l.name AS levelName,
+               COUNT(ulp.user_id) AS attemptCount,
+               SUM(ulp.passed) AS passCount,
+               IF(COUNT(ulp.user_id)>0, ROUND(SUM(ulp.passed)*100.0/COUNT(ulp.user_id),2), 0) AS passRate
+        FROM levels l
+        LEFT JOIN user_level_progress ulp ON l.id = ulp.level_id
+        WHERE l.grade_id = #{gradeId}
+        GROUP BY l.id, l.name
+        ORDER BY l.sort_order, l.id
+    </select>
+    <select id="studentActiveRank" resultType="map">
+        SELECT u.id AS userId, u.real_name AS realName, u.username,
+               COUNT(a.id) AS attemptCount,
+               COALESCE(SUM(a.time_spent),0) AS totalTimeSpent
+        FROM users u
+        LEFT JOIN attempts a ON u.id = a.user_id
+        WHERE u.role_id = 1
+        <if test="classId != null">AND u.class_id = #{classId}</if>
+        GROUP BY u.id
+        ORDER BY attemptCount DESC
+        LIMIT #{limit}
+    </select>
+    <select id="wrongQuestionHot" resultType="map">
+        SELECT q.id AS questionId, LEFT(q.content, 50) AS contentBrief,
+               COUNT(wq.user_id) AS wrongCount
+        FROM wrong_questions wq
+        JOIN questions q ON wq.question_id = q.id
+        <if test="gradeId != null">WHERE q.grade_id = #{gradeId}</if>
+        <if test="gradeId == null">WHERE 1=1</if>
+        GROUP BY q.id, q.content
+        ORDER BY wrongCount DESC
+        LIMIT #{limit}
+    </select>
+    <select id="kpMasteryHeatmap" resultType="map">
+        SELECT ukp.kp_id AS kpId, kp.name AS kpName, u.id AS userId, u.real_name AS realName,
+               COALESCE(ukp.mastery_score, 0) AS masteryScore
+        FROM users u
+        CROSS JOIN knowledge_points kp
+        LEFT JOIN user_kp_mastery ukp ON ukp.user_id = u.id AND ukp.kp_id = kp.id
+        WHERE u.role_id = 1
+        <if test="classId != null">AND u.class_id = #{classId}</if>
+        ORDER BY u.id, kp.id
+    </select>
+</mapper>

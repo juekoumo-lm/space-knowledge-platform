@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.ClazzMapper">
+
+    <resultMap id="clazzMap" type="com.space.knowledge.entity.Clazz">
+        <id column="id" property="id"/>
+        <result column="grade_id" property="gradeId"/>
+        <result column="name" property="name"/>
+    </resultMap>
+
+    <select id="selectByGradeId" resultMap="clazzMap">
+        SELECT id, grade_id, name
+        FROM classes
+        WHERE grade_id = #{gradeId}
+        ORDER BY name
+    </select>
+
+    <select id="selectById" resultMap="clazzMap">
+        SELECT id, grade_id, name
+        FROM classes
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO classes (grade_id, name)
+        VALUES (#{gradeId}, #{name})
+    </insert>
+
+    <update id="update">
+        UPDATE classes
+        SET grade_id = #{gradeId},
+            name = #{name}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM classes
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

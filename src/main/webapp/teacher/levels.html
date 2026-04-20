@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>关卡管理 - 航天知识闯关</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body { background: #1b263b; color: #e0e1dd; }
+        .card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); }
+        .table { color: #e0e1dd; }
+        .badge { font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">关卡管理</span>
+            <a href="dashboard.html" class="btn btn-outline-light btn-sm">可视化大屏</a>
+            <a href="questions.html" class="btn btn-outline-light btn-sm">题库管理</a>
+            <a href="../login.html" class="btn btn-outline-light btn-sm" onclick="localStorage.clear()">退出</a>
+        </div>
+    </nav>
+    <div class="container py-4">
+        <div class="card p-3 mb-3">
+            <div class="row g-2">
+                <div class="col-auto"><select class="form-select form-select-sm" id="gradeId"><option value="">年级</option></select></div>
+                <div class="col-auto"><button class="btn btn-primary btn-sm" id="btnSearch">查询</button></div>
+                <div class="col-auto"><button class="btn btn-primary btn-sm" id="btnAdd">新建关卡</button></div>
+            </div>
+        </div>
+        <div class="card p-3">
+            <table class="table table-dark table-striped">
+                <thead><tr><th>ID</th><th>名称</th><th>年级</th><th>难度</th><th>题目数</th><th>操作</th></tr></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- 关卡编辑模态框 -->
+    <div class="modal fade" id="levelModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">新建关卡</h5>
+                    <button type="button" class="btn-close text-light" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="levelId">
+                    <div class="mb-3">
+                        <label class="form-label">关卡名称</label>
+                        <input type="text" class="form-control" id="levelName" placeholder="请输入关卡名称">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">年级</label>
+                            <select class="form-select" id="levelGradeId"><option value="">选择年级</option></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">难度</label>
+                            <select class="form-select" id="levelDifficulty">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">题目数量</label>
+                            <input type="number" class="form-control" id="questionCount" value="5" min="1" max="50">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">主题/章节</label>
+                        <input type="text" class="form-control" id="levelTheme" placeholder="请输入主题或章节">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">所需知识点ID（逗号分隔）</label>
+                        <input type="text" class="form-control" id="requiredKps" placeholder="例如：1,2,3">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">通过分数</label>
+                        <input type="number" class="form-control" id="passScore" value="60" min="0" max="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">排序</label>
+                        <input type="number" class="form-control" id="sortOrder" value="0" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveLevel">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 关卡题目设置模态框 -->
+    <div class="modal fade" id="questionSetModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="questionSetTitle">设置关卡题目</h5>
+                    <button type="button" class="btn-close text-light" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="currentLevelId">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <select class="form-select" id="questionGradeId"><option value="">年级</option></select>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" id="questionType">
+                                <option value="">题型</option>
+                                <option value="SINGLE">单选题</option>
+                                <option value="MULTIPLE">多选题</option>
+                                <option value="JUDGE">判断题</option>
+                                <option value="FILL">填空题</option>
+                                <option value="SUBJECTIVE">主观题</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" id="questionDifficulty">
+                                <option value="">难度</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="questionKeyword" placeholder="关键词搜索">
+                    </div>
+                    <div class="mb-3">
+                        <button class="btn btn-primary btn-sm" id="btnSearchQuestions">搜索题目</button>
+                        <button class="btn btn-secondary btn-sm ms-2" id="btnClearSelection">清空选择</button>
+                    </div>
+                    <div class="card p-3 mb-3">
+                        <h6>已选择的题目 (<span id="selectedCount">0</span>)</h6>
+                        <div id="selectedQuestions"></div>
+                    </div>
+                    <div class="card p-3">
+                        <h6>可选题目</h6>
+                        <div id="availableQuestions"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveQuestionSet">保存题目设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8081/space-knowledge/api';
+        const token = localStorage.getItem('token');
+        if (!token) location.href = '../login.html';
+        function authHeaders() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+        
+        // 加载年级列表
+        fetch(API_BASE + '/grades', { headers: authHeaders() }).then(r => r.json()).then(d => {
+            if (d.code === 200 && d.data) {
+                const gradeSelects = ['gradeId', 'levelGradeId', 'questionGradeId'];
+                gradeSelects.forEach(id => {
+                    const select = document.getElementById(id);
+                    d.data.forEach(g => {
+                        select.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+                    });
+                });
+            }
+        });
+        
+        let selectedQuestionIds = new Set();
+        
+        function loadLevelList() {
+            const gradeId = document.getElementById('gradeId').value || null;
+            let url = `${API_BASE}/teacher/levels`;
+            if (gradeId) url += `?gradeId=${gradeId}`;
+            
+            document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div> 加载中...</td></tr>';
+            
+            fetch(url, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.code === 200 && d.data) {
+                        const list = d.data;
+                        if (list.length === 0) {
+                            document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="text-center">暂无数据</td></tr>';
+                        } else {
+                            document.getElementById('tbody').innerHTML = list.map(l => 
+                                `<tr>
+                                    <td>${l.id}</td>
+                                    <td>${l.name}</td>
+                                    <td>${l.gradeName || '未知'}</td>
+                                    <td>${l.difficulty}</td>
+                                    <td>${l.questionCount}</td>
+                                    <td>
+                                        <a href="#" class="text-warning me-2" onclick="editLevel(${l.id})">编辑</a>
+                                        <a href="#" class="text-info me-2" onclick="setQuestions(${l.id})">设置题目</a>
+                                        <a href="#" class="text-danger" onclick="deleteLevel(${l.id})">删除</a>
+                                    </td>
+                                </tr>`
+                            ).join('');
+                        }
+                    } else {
+                        document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="text-center">加载失败</td></tr>';
+                    }
+                })
+                .catch(err => {
+                    console.error('加载关卡列表失败:', err);
+                    document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="text-center">加载失败</td></tr>';
+                });
+        }
+        
+        function resetLevelForm() {
+            document.getElementById('levelId').value = '';
+            document.getElementById('levelName').value = '';
+            document.getElementById('levelGradeId').value = '';
+            document.getElementById('levelDifficulty').value = '1';
+            document.getElementById('questionCount').value = '5';
+            document.getElementById('levelTheme').value = '';
+            document.getElementById('requiredKps').value = '';
+            document.getElementById('passScore').value = '60';
+            document.getElementById('sortOrder').value = '0';
+        }
+        
+        function editLevel(id) {
+            fetch(`${API_BASE}/teacher/levels/${id}`, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.code === 200 && d.data) {
+                        const l = d.data;
+                        document.getElementById('levelId').value = l.id;
+                        document.getElementById('levelName').value = l.name;
+                        document.getElementById('levelGradeId').value = l.gradeId || '';
+                        document.getElementById('levelDifficulty').value = l.difficulty || '1';
+                        document.getElementById('questionCount').value = l.questionCount || '5';
+                        document.getElementById('levelTheme').value = l.theme || '';
+                        document.getElementById('requiredKps').value = l.requiredKps || '';
+                        document.getElementById('passScore').value = l.passScore || '60';
+                        document.getElementById('sortOrder').value = l.sortOrder || '0';
+                        document.getElementById('modalTitle').textContent = '编辑关卡';
+                        new bootstrap.Modal(document.getElementById('levelModal')).show();
+                    }
+                });
+        }
+        
+        function deleteLevel(id) {
+            if (confirm('确定要删除这个关卡吗？')) {
+                fetch(`${API_BASE}/teacher/levels/${id}`, {
+                    method: 'DELETE',
+                    headers: authHeaders()
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.code === 200) {
+                        alert('删除成功');
+                        loadLevelList();
+                    } else {
+                        alert('删除失败: ' + (d.message || '未知错误'));
+                    }
+                });
+            }
+        }
+        
+        function setQuestions(levelId) {
+            document.getElementById('currentLevelId').value = levelId;
+            selectedQuestionIds.clear();
+            updateSelectedQuestions();
+            
+            // 加载关卡已有的题目
+            fetch(`${API_BASE}/teacher/levels/${levelId}/questions`, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.code === 200 && d.data) {
+                        d.data.forEach(q => selectedQuestionIds.add(q.id));
+                        updateSelectedQuestions();
+                    }
+                });
+            
+            // 加载可选题目
+            loadAvailableQuestions();
+            
+            document.getElementById('questionSetTitle').textContent = '设置关卡题目';
+            new bootstrap.Modal(document.getElementById('questionSetModal')).show();
+        }
+        
+        function loadAvailableQuestions() {
+            const gradeId = document.getElementById('questionGradeId').value || null;
+            const type = document.getElementById('questionType').value || null;
+            const difficulty = document.getElementById('questionDifficulty').value || null;
+            const keyword = document.getElementById('questionKeyword').value || '';
+            
+            let url = `${API_BASE}/teacher/questions?page=1&size=50`;
+            if (gradeId) url += `&gradeId=${gradeId}`;
+            if (type) url += `&type=${type}`;
+            if (difficulty) url += `&difficulty=${difficulty}`;
+            if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+            
+            document.getElementById('availableQuestions').innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+            
+            fetch(url, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.code === 200 && d.data && d.data.list) {
+                        const list = d.data.list;
+                        if (list.length === 0) {
+                            document.getElementById('availableQuestions').innerHTML = '<p class="text-muted text-center">暂无题目</p>';
+                        } else {
+                            document.getElementById('availableQuestions').innerHTML = list.map(q => 
+                                `<div class="card mb-2 p-2" style="${selectedQuestionIds.has(q.id) ? 'background: rgba(74, 111, 165, 0.2);' : ''}">
+                                    <div class="row">
+                                        <div class="col-auto">
+                                            <input type="checkbox" class="form-check-input" ${selectedQuestionIds.has(q.id) ? 'checked' : ''} onchange="toggleQuestion(${q.id}, this.checked)">
+                                        </div>
+                                        <div class="col">
+                                            <div><strong>${q.content.substring(0, 50)}${q.content.length > 50 ? '...' : ''}</strong></div>
+                                            <div class="text-sm text-muted">题型: ${q.type} | 难度: ${q.difficulty} | 年级: ${q.gradeName || '未知'}</div>
+                                        </div>
+                                    </div>
+                                </div>`
+                            ).join('');
+                        }
+                    } else {
+                        document.getElementById('availableQuestions').innerHTML = '<p class="text-danger text-center">加载失败</p>';
+                    }
+                });
+        }
+        
+        function toggleQuestion(questionId, checked) {
+            if (checked) {
+                selectedQuestionIds.add(questionId);
+            } else {
+                selectedQuestionIds.delete(questionId);
+            }
+            updateSelectedQuestions();
+            // 刷新可选题目列表，更新选中状态
+            loadAvailableQuestions();
+        }
+        
+        function updateSelectedQuestions() {
+            document.getElementById('selectedCount').textContent = selectedQuestionIds.size;
+            if (selectedQuestionIds.size === 0) {
+                document.getElementById('selectedQuestions').innerHTML = '<p class="text-muted">暂无选择</p>';
+            } else {
+                document.getElementById('selectedQuestions').innerHTML = Array.from(selectedQuestionIds).map(id => 
+                    `<span class="badge bg-primary me-2 mb-2">题目 ${id} <a href="#" onclick="removeSelectedQuestion(${id})" style="color: white;">&times;</a></span>`
+                ).join('');
+            }
+        }
+        
+        function removeSelectedQuestion(questionId) {
+            selectedQuestionIds.delete(questionId);
+            updateSelectedQuestions();
+            loadAvailableQuestions();
+        }
+        
+        // 事件监听
+        document.getElementById('btnSearch').onclick = loadLevelList;
+        document.getElementById('btnAdd').onclick = function() {
+            resetLevelForm();
+            document.getElementById('modalTitle').textContent = '新建关卡';
+            new bootstrap.Modal(document.getElementById('levelModal')).show();
+        };
+        
+        document.getElementById('btnSaveLevel').onclick = function() {
+            const id = document.getElementById('levelId').value;
+            const name = document.getElementById('levelName').value;
+            const gradeId = document.getElementById('levelGradeId').value;
+            const difficulty = document.getElementById('levelDifficulty').value;
+            const questionCount = document.getElementById('questionCount').value;
+            const theme = document.getElementById('levelTheme').value;
+            const requiredKps = document.getElementById('requiredKps').value;
+            const passScore = document.getElementById('passScore').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            if (!name || !gradeId) {
+                alert('请填写关卡名称和年级');
+                return;
+            }
+            
+            const level = {
+                id: id ? parseInt(id) : null,
+                name: name,
+                gradeId: parseInt(gradeId),
+                difficulty: parseInt(difficulty),
+                questionCount: parseInt(questionCount),
+                theme: theme,
+                requiredKps: requiredKps,
+                passScore: parseFloat(passScore),
+                sortOrder: parseInt(sortOrder)
+            };
+            
+            fetch(`${API_BASE}/teacher/levels`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify(level)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.code === 200) {
+                    alert('保存成功');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('levelModal'));
+                    if (modal) modal.hide();
+                    loadLevelList();
+                } else {
+                    alert('保存失败: ' + (d.message || '未知错误'));
+                }
+            });
+        };
+        
+        document.getElementById('btnSearchQuestions').onclick = loadAvailableQuestions;
+        document.getElementById('btnClearSelection').onclick = function() {
+            selectedQuestionIds.clear();
+            updateSelectedQuestions();
+            loadAvailableQuestions();
+        };
+        
+        document.getElementById('btnSaveQuestionSet').onclick = function() {
+            const levelId = document.getElementById('currentLevelId').value;
+            const questionIds = Array.from(selectedQuestionIds);
+            
+            fetch(`${API_BASE}/teacher/levels/${levelId}/questions`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify(questionIds)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.code === 200) {
+                    alert('保存成功');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('questionSetModal'));
+                    if (modal) modal.hide();
+                } else {
+                    alert('保存失败: ' + (d.message || '未知错误'));
+                }
+            });
+        };
+        
+        // 初始化加载
+        loadLevelList();
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.LevelQuestionMapper">
+    <insert id="insert">INSERT INTO level_questions (level_id, question_id) VALUES (#{levelId}, #{questionId})</insert>
+    <insert id="insertBatch">
+        INSERT INTO level_questions (level_id, question_id) VALUES
+        <foreach collection="questionIds" item="qid" separator=",">(#{levelId}, #{qid})</foreach>
+    </insert>
+    <delete id="deleteByLevelId">DELETE FROM level_questions WHERE level_id=#{levelId}</delete>
+</mapper>

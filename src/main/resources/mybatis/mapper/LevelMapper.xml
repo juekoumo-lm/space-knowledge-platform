@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.LevelMapper">
+    <resultMap id="BaseResultMap" type="Level">
+        <result column="grade_id" property="gradeId"/>
+        <result column="required_kps" property="requiredKps"/>
+        <result column="question_count" property="questionCount"/>
+        <result column="pass_score" property="passScore"/>
+        <result column="sort_order" property="sortOrder"/>
+    </resultMap>
+    <select id="selectById" resultMap="BaseResultMap">SELECT l.*, g.name as grade_name FROM levels l LEFT JOIN grades g ON l.grade_id=g.id WHERE l.id=#{id}</select>
+    <select id="selectByGradeId" resultMap="BaseResultMap">SELECT l.*, g.name as grade_name FROM levels l LEFT JOIN grades g ON l.grade_id=g.id WHERE l.grade_id=#{gradeId} ORDER BY l.sort_order, l.id</select>
+    <select id="selectQuestionIdsByLevelId" resultType="long">SELECT question_id FROM level_questions WHERE level_id=#{levelId}</select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO levels (name, grade_id, theme, difficulty, required_kps, question_count, pass_score, sort_order)
+        VALUES (#{name}, #{gradeId}, #{theme}, #{difficulty}, #{requiredKps}, #{questionCount}, #{passScore}, #{sortOrder})
+    </insert>
+    <update id="update">
+        UPDATE levels SET name=#{name}, theme=#{theme}, difficulty=#{difficulty}, required_kps=#{requiredKps},
+        question_count=#{questionCount}, pass_score=#{passScore}, sort_order=#{sortOrder} WHERE id=#{id}
+    </update>
+    <delete id="delete">
+        DELETE FROM levels WHERE id=#{id}
+    </delete>
+</mapper>

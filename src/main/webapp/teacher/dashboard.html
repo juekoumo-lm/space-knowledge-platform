@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>教师可视化大屏 - 航天知识闯关</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body { 
+            background: #0d1b2a; 
+            color: #e0e1dd; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card { 
+            background: rgba(255,255,255,0.06); 
+            border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        .card:hover { 
+            box-shadow: 0 6px 24px rgba(61, 90, 128, 0.25);
+            transform: translateY(-2px);
+        }
+        .chart { 
+            height: 280px; 
+        }
+        .btn-primary { 
+            background: #3d5a80; 
+            border: none; 
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover { 
+            background: #4a6fa5; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 111, 165, 0.4);
+        }
+        .form-select { 
+            background: rgba(255,255,255,0.1); 
+            border: 1px solid rgba(255,255,255,0.2); 
+            color: #e0e1dd;
+        }
+        .form-select:focus { 
+            background: rgba(255,255,255,0.15); 
+            border-color: #4a6fa5; 
+            box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.25);
+        }
+        h6 { 
+            color: #e0e1dd; 
+            font-weight: 600;
+        }
+        label { 
+            color: #adb5bd; 
+        }
+        .navbar { 
+            background: rgba(13, 27, 42, 0.95); 
+            backdrop-filter: blur(10px);
+        }
+        .btn-outline-light { 
+            border-color: rgba(255,255,255,0.3); 
+            color: #e0e1dd; 
+            transition: all 0.3s ease;
+        }
+        .btn-outline-light:hover { 
+            background: rgba(255,255,255,0.1); 
+            border-color: #4a6fa5;
+            color: #e0e1dd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">教师可视化大屏</span>
+            <a href="levels.html" class="btn btn-outline-light btn-sm">关卡管理</a>
+            <a href="questions.html" class="btn btn-outline-light btn-sm">题库管理</a>
+            <a href="../login.html" class="btn btn-outline-light btn-sm" onclick="localStorage.clear()">退出</a>
+        </div>
+    </nav>
+    <div class="container-fluid py-3">
+        <div class="mb-3">
+            <label>年级</label>
+            <select class="form-select form-select-sm d-inline-block w-auto ms-2" id="gradeId">
+                <option value="">全部</option>
+            </select>
+            <button class="btn btn-primary btn-sm ms-2" id="btnRefresh">刷新</button>
+        </div>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6>关卡通过率</h6>
+                    <div id="chartPassRate" class="chart"></div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6>学生活跃度排行</h6>
+                    <div id="chartRank" class="chart"></div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6>高频错题</h6>
+                    <div id="chartWrong" class="chart"></div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6>知识点掌握分布（示例）</h6>
+                    <div id="chartMastery" class="chart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.origin + '/space-knowledge/api';
+        const token = localStorage.getItem('token');
+        if (!token) location.href = '../login.html';
+
+        function authHeaders() { return { 'Authorization': 'Bearer ' + token }; }
+
+        fetch(API_BASE + '/grades', { headers: authHeaders() }).then(r => r.json()).then(d => {
+            if (d.code === 200 && d.data) {
+                const sel = document.getElementById('gradeId');
+                d.data.forEach(g => sel.innerHTML += `<option value="${g.id}">${g.name}</option>`);
+            }
+        });
+
+        // 缓存图表实例，避免重复初始化
+        let chartInstances = {};
+        
+        function loadData() {
+            const gradeId = document.getElementById('gradeId').value || null;
+            const qs = new URLSearchParams();
+            if (gradeId) qs.set('gradeId', gradeId);
+            
+            // 显示加载状态
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                const chartElement = card.querySelector('.chart');
+                if (chartElement) {
+                    chartElement.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="height: 100%;"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+                }
+            });
+            
+            fetch(API_BASE + '/dashboard/overview?' + qs.toString(), { headers: authHeaders() })
+                .then(r => {
+                    if (!r.ok) throw new Error('网络错误');
+                    return r.json();
+                })
+                .then(d => {
+                    if (d.code !== 200 || !d.data) return;
+                    const data = d.data;
+
+                    // 渲染关卡通过率图表
+                    const passRate = data.levelPassRate || [];
+                    renderChart('chartPassRate', {
+                        tooltip: {},
+                        grid: { left: 60, right: 20, top: 20, bottom: 40 },
+                        xAxis: { type: 'category', data: passRate.map(x => x.levelName), axisLabel: { color: '#adb5bd' } },
+                        yAxis: { type: 'value', name: '通过率%', axisLabel: { color: '#adb5bd' } },
+                        series: [{ type: 'bar', data: passRate.map(x => x.passRate || 0), itemStyle: { color: '#3d5a80' } }]
+                    });
+
+                    // 渲染学生活跃度排行图表
+                    const rank = data.studentRank || [];
+                    renderChart('chartRank', {
+                        tooltip: {},
+                        grid: { left: 80, right: 20, top: 20, bottom: 40 },
+                        xAxis: { type: 'category', data: rank.map(x => x.realName || x.username), axisLabel: { color: '#adb5bd', rotate: 30 } },
+                        yAxis: { type: 'value', name: '答题次数', axisLabel: { color: '#adb5bd' } },
+                        series: [{ type: 'bar', data: rank.map(x => x.attemptCount || 0), itemStyle: { color: '#4a6fa5' } }]
+                    });
+
+                    // 渲染高频错题图表
+                    const wrong = data.wrongHot || [];
+                    renderChart('chartWrong', {
+                        tooltip: {},
+                        grid: { left: 100, right: 20, top: 20, bottom: 60 },
+                        xAxis: { type: 'category', data: wrong.map(x => (x.contentBrief || '').substring(0, 12)), axisLabel: { color: '#adb5bd', rotate: 45 } },
+                        yAxis: { type: 'value', name: '错误次数', axisLabel: { color: '#adb5bd' } },
+                        series: [{ type: 'bar', data: wrong.map(x => x.wrongCount || 0), itemStyle: { color: '#e07a5f' } }]
+                    });
+
+                    // 渲染知识点掌握分布图表
+                    const kp = data.kpMastery || [];
+                    const kpNames = [...new Set(kp.map(x => x.kpName))];
+                    const userNames = [...new Set(kp.map(x => x.realName))];
+                    const heatData = userNames.flatMap((un, i) => kpNames.map((kn, j) => {
+                        const o = kp.find(x => x.realName === un && x.kpName === kn);
+                        return [j, i, (o && o.masteryScore != null) ? Math.round(o.masteryScore * 100) : 0];
+                    }));
+                    renderChart('chartMastery', {
+                        tooltip: { position: 'top' },
+                        grid: { left: 120, right: 40, top: 30, bottom: 60 },
+                        xAxis: { type: 'category', data: kpNames.map(n => (n || '').substring(0, 6)), axisLabel: { color: '#adb5bd', rotate: 45 } },
+                        yAxis: { type: 'category', data: userNames, axisLabel: { color: '#adb5bd' } },
+                        visualMap: { min: 0, max: 100, inRange: { color: ['#1b263b', '#3d5a80', '#4a6fa5', '#e0e1dd'] } },
+                        series: [{ type: 'heatmap', data: heatData }]
+                    });
+                })
+                .catch(err => {
+                    console.error('加载数据失败:', err);
+                    // 显示错误提示
+                    const cards = document.querySelectorAll('.card');
+                    cards.forEach(card => {
+                        const chartElement = card.querySelector('.chart');
+                        if (chartElement) {
+                            chartElement.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="height: 100%;"><p class="text-danger">加载失败</p></div>';
+                        }
+                    });
+                });
+        }
+        
+        // 渲染图表的辅助函数
+        function renderChart(chartId, option) {
+            const chartElement = document.getElementById(chartId);
+            if (!chartElement) return;
+            
+            // 复用图表实例
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].setOption(option);
+            } else {
+                chartInstances[chartId] = echarts.init(chartElement);
+                chartInstances[chartId].setOption(option);
+            }
+        }
+        
+        // 优化窗口 resize 事件处理
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                Object.values(chartInstances).forEach(chart => chart.resize());
+            }, 100);
+        });
+
+        document.getElementById('btnRefresh').onclick = loadData;
+        loadData();
+        window.addEventListener('resize', () => {
+            ['chartPassRate','chartRank','chartWrong','chartMastery'].forEach(id => echarts.getInstanceByDom(document.getElementById(id))?.resize());
+        });
+    </script>
+</body>
+</html>

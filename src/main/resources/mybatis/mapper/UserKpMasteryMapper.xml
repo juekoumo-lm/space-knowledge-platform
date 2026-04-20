@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.UserKpMasteryMapper">
+    <resultMap id="BaseResultMap" type="UserKpMastery">
+        <result column="user_id" property="userId"/>
+        <result column="kp_id" property="kpId"/>
+        <result column="mastery_score" property="masteryScore"/>
+        <result column="last_update" property="lastUpdate"/>
+    </resultMap>
+    <select id="select" resultMap="BaseResultMap">SELECT * FROM user_kp_mastery WHERE user_id=#{userId} AND kp_id=#{kpId}</select>
+    <select id="selectByUserId" resultMap="BaseResultMap">SELECT * FROM user_kp_mastery WHERE user_id=#{userId}</select>
+    <insert id="insertOrUpdate">
+        INSERT INTO user_kp_mastery (user_id, kp_id, mastery_score) VALUES (#{userId}, #{kpId}, #{masteryScore})
+        ON DUPLICATE KEY UPDATE mastery_score=VALUES(mastery_score), last_update=NOW()
+    </insert>
+</mapper>

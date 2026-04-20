@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.AssignmentMapper">
+
+    <resultMap id="assignmentMap" type="com.space.knowledge.entity.Assignment">
+        <id column="id" property="id"/>
+        <result column="teacher_id" property="teacherId"/>
+        <result column="class_id" property="classId"/>
+        <result column="level_id" property="levelId"/>
+        <result column="question_ids" property="questionIds"/>
+        <result column="title" property="title"/>
+        <result column="due_at" property="dueAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="selectByTeacherId" resultMap="assignmentMap">
+        SELECT id, teacher_id, class_id, level_id, question_ids, title, due_at, created_at
+        FROM assignments
+        WHERE teacher_id = #{teacherId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByClassId" resultMap="assignmentMap">
+        SELECT id, teacher_id, class_id, level_id, question_ids, title, due_at, created_at
+        FROM assignments
+        WHERE class_id = #{classId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectById" resultMap="assignmentMap">
+        SELECT id, teacher_id, class_id, level_id, question_ids, title, due_at, created_at
+        FROM assignments
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO assignments (teacher_id, class_id, level_id, question_ids, title, due_at, created_at)
+        VALUES (#{teacherId}, #{classId}, #{levelId}, #{questionIds}, #{title}, #{dueAt}, NOW())
+    </insert>
+
+    <update id="update">
+        UPDATE assignments
+        SET class_id = #{classId},
+            level_id = #{levelId},
+            question_ids = #{questionIds},
+            title = #{title},
+            due_at = #{dueAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM assignments
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

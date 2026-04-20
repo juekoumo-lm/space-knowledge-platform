@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>练习 - 航天知识闯关</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #1b263b; color: #e0e1dd; }
+        .card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a href="index.html" class="navbar-brand">← 返回</a>
+        </div>
+    </nav>
+    <div class="container py-4">
+        <div class="card p-4" id="questionCard"></div>
+        <button class="btn btn-primary mt-3" id="btnSubmit">提交</button>
+        <div class="mt-2" id="result"></div>
+    </div>
+    <script>
+        const API_BASE = window.location.origin + '/space-knowledge/api';
+        const token = localStorage.getItem('token');
+        if (!token) location.href = '../login.html';
+        const qid = new URLSearchParams(location.search).get('qid');
+        if (!qid) { location.href = 'index.html'; }
+
+        fetch(API_BASE + '/student/question/' + qid, { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(r => r.json()).then(d => {
+                if (d.code !== 200 || !d.data) { document.getElementById('questionCard').innerHTML = '题目不存在'; return; }
+                const q = d.data;
+                let html = '<h5>' + (q.content || '') + '</h5>';
+                
+                if (q.options && q.options.length) {
+                    const inputType = q.type === 'MULTIPLE' ? 'checkbox' : 'radio';
+                    q.options.forEach(o => html += `<div class="form-check"><input class="form-check-input" type="${inputType}" name="answer" value="${o.optionLabel}"><label class="form-check-label">${o.optionLabel}. ${o.optionText}</label></div>`);
+                } else if (q.type === 'JUDGE') {
+                    html += `<div class="form-check"><input class="form-check-input" type="radio" name="answer" value="A"><label class="form-check-label">A. 正确</label></div>`;
+                    html += `<div class="form-check"><input class="form-check-input" type="radio" name="answer" value="B"><label class="form-check-label">B. 错误</label></div>`;
+                } else if (q.type === 'FILL') {
+                    html += `<input type="text" class="form-control" name="answer" placeholder="请输入答案">`;
+                } else if (q.type === 'SUBJECTIVE') {
+                    html += `<textarea class="form-control" name="answer" rows="3" placeholder="请输入答案"></textarea>`;
+                }
+                
+                document.getElementById('questionCard').innerHTML = html;
+                document.getElementById('btnSubmit').onclick = function() {
+                    let answer = '';
+                    if (q.type === 'MULTIPLE') {
+                        const selected = [...document.querySelectorAll('input[name=answer]:checked')].map(x => x.value).join(',');
+                        answer = selected;
+                    } else if (q.type === 'SINGLE' || q.type === 'JUDGE') {
+                        const sel = document.querySelector('input[name=answer]:checked');
+                        answer = sel ? sel.value : '';
+                    } else if (q.type === 'FILL') {
+                        const input = document.querySelector('input[name=answer]');
+                        answer = input ? input.value : '';
+                    } else if (q.type === 'SUBJECTIVE') {
+                        const textarea = document.querySelector('textarea[name=answer]');
+                        answer = textarea ? textarea.value : '';
+                    }
+                    
+                    fetch(API_BASE + '/student/answer', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ questionId: q.id, answer: answer, timeSpent: 0, source: 'practice' })
+                    }).then(r => r.json()).then(d => {
+                        const correct = d.code === 200 && d.data && d.data.correct;
+                        let resultHtml = correct ? '<span class="text-success">回答正确</span>' : '<span class="text-danger">回答错误</span>';
+                        document.getElementById('result').innerHTML = resultHtml;
+                        fetch(API_BASE + '/student/question/' + qid + '/analysis', { headers: { 'Authorization': 'Bearer ' + token } })
+                            .then(r => r.json()).then(da => { if (da.code === 200 && da.data) document.getElementById('result').innerHTML += '<p class="mt-2">解析：' + da.data + '</p>'; });
+                    });
+                };
+            }).catch(() => document.getElementById('questionCard').innerHTML = '加载失败');
+    </script>
+</body>
+</html>

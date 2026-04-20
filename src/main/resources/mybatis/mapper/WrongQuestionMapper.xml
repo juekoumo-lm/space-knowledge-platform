@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.space.knowledge.mapper.WrongQuestionMapper">
+    <resultMap id="BaseResultMap" type="WrongQuestion">
+        <result column="user_id" property="userId"/>
+        <result column="question_id" property="questionId"/>
+        <result column="added_at" property="addedAt"/>
+    </resultMap>
+    <insert id="insert">INSERT IGNORE INTO wrong_questions (user_id, question_id, note) VALUES (#{userId}, #{questionId}, #{note})</insert>
+    <delete id="delete">DELETE FROM wrong_questions WHERE user_id=#{userId} AND question_id=#{questionId}</delete>
+    <select id="selectByUserId" resultMap="BaseResultMap">SELECT * FROM wrong_questions WHERE user_id=#{userId} ORDER BY added_at DESC LIMIT #{offset}, #{limit}</select>
+    <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM wrong_questions WHERE user_id=#{userId}</select>
+    <select id="selectOne" resultMap="BaseResultMap">SELECT * FROM wrong_questions WHERE user_id=#{userId} AND question_id=#{questionId}</select>
+</mapper>
