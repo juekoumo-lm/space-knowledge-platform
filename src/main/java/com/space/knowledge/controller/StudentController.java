@@ -65,6 +65,23 @@ public class StudentController {
         }
     }
 
+    private Boolean parseBoolean(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        String text = value.toString().trim().toLowerCase();
+        if ("true".equals(text) || "1".equals(text)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(text) || "0".equals(text)) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
     @GetMapping("/levels")
     public Result<List<Level>> levels(HttpServletRequest req, @RequestParam Integer gradeId) {
         Long userId = userId(req);
@@ -252,7 +269,10 @@ public class StudentController {
         if (score != null && (score.compareTo(java.math.BigDecimal.ZERO) < 0 || score.compareTo(new java.math.BigDecimal("100")) > 0)) {
             return Result.fail("分数范围应为0-100");
         }
-        Boolean passed = (Boolean) body.get("passed");
+        Boolean passed = parseBoolean(body.get("passed"));
+        if (body.get("passed") != null && passed == null) {
+            return Result.fail("通过标识格式错误");
+        }
         Integer timeSpent = parseInteger(body.get("timeSpent"));
         if (body.get("timeSpent") != null && timeSpent == null) {
             return Result.fail("用时格式错误");

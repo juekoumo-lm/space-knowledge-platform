@@ -116,14 +116,18 @@ public class LevelService {
 
         int masteryStreak = calculateKnowledgePointStreak(attempts);
         String suggestion;
+        String reason;
         Integer nextLevelId = levelMapper.selectNextLevelId(level.getGradeId(), level.getSortOrder() != null ? level.getSortOrder() : 0, level.getId());
 
         if (accuracy >= 1.0 && avgTime > 0 && avgTime <= gradeAvgTime * 0.8 && masteryStreak >= 3) {
             suggestion = "ELITE_CHALLENGE";
+            reason = "正确率满分且答题速度优秀，满足精英挑战条件";
         } else if (accuracy < 0.4) {
             suggestion = "RECHALLENGE";
+            reason = "本关正确率较低，建议先巩固后再挑战";
         } else {
             suggestion = "NORMAL_UNLOCK";
+            reason = "学习表现稳定，建议继续下一关";
         }
 
         result.put("accuracy", accuracy);
@@ -132,6 +136,7 @@ public class LevelService {
         result.put("masteryStreak", masteryStreak);
         result.put("nextLevelId", nextLevelId);
         result.put("nextLevelSuggestion", suggestion);
+        result.put("nextLevelReason", reason);
         return result;
     }
 

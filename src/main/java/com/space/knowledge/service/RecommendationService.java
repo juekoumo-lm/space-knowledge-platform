@@ -46,8 +46,20 @@ public class RecommendationService {
             return Collections.emptyList();
         }
         List<Question> cfRecommend = recommendQuestionsByCF(userId, limit);
-        if (!cfRecommend.isEmpty()) {
+        if (cfRecommend.size() >= limit) {
             return cfRecommend;
+        }
+
+        Set<Long> excludeIds = cfRecommend.stream().map(Question::getId).collect(Collectors.toSet());
+        List<Question> contentRecommend = recommendByContent(userId, gradeId, limit - cfRecommend.size(), excludeIds);
+        List<Question> merged = new ArrayList<>(cfRecommend);
+        merged.addAll(contentRecommend);
+        return merged;
+    }
+
+    private List<Question> recommendByContent(Long userId, Integer gradeId, int limit, Set<Long> excludeIds) {
+        if (limit <= 0) {
+            return Collections.emptyList();
         }
 
         int suggestedDifficulty = suggestDifficulty(userId);
@@ -55,20 +67,24 @@ public class RecommendationService {
         List<Long> wrongIds = getWrongQuestionIds(userId);
         List<Integer> weakKpIds = getWeakKpIds(userId);
 
-        Set<Long> candidateSet = new LinkedHashSet<>(wrongIds);
+        Set<Long> candidateSet = wrongIds.stream()
+                .filter(id -> !doneIds.contains(id))
+                .filter(id -> excludeIds == null || !excludeIds.contains(id))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         List<Question> byKp = gradeId != null
                 ? questionMapper.selectByCondition(gradeId, weakKpIds.isEmpty() ? null : weakKpIds.get(0), suggestedDifficulty, null, null, 0, 50)
                 : questionMapper.selectByCondition(null, null, suggestedDifficulty, null, null, 0, 50);
         for (Question q : byKp) {
-            if (!doneIds.contains(q.getId())) candidateSet.add(q.getId());
+            if (!doneIds.contains(q.getId()) && (excludeIds == null || !excludeIds.contains(q.getId()))) {
+                candidateSet.add(q.getId());
+            }
         }
         List<Long> candidateIds = new ArrayList<>(candidateSet);
         if (candidateIds.size() > limit) {
             Collections.shuffle(candidateIds);
             candidateIds = candidateIds.subList(0, limit);
         }
-        List<Long> finalIds = candidateIds;
-        return finalIds.stream()
+        return candidateIds.stream()
                 .map(id -> questionService.getByIdForAnswer(id))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
