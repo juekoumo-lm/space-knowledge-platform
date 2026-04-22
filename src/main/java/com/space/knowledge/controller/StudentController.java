@@ -249,10 +249,16 @@ public class StudentController {
         if (body.get("score") != null && score == null) {
             return Result.fail("分数格式错误");
         }
+        if (score != null && (score.compareTo(java.math.BigDecimal.ZERO) < 0 || score.compareTo(new java.math.BigDecimal("100")) > 0)) {
+            return Result.fail("分数范围应为0-100");
+        }
         Boolean passed = (Boolean) body.get("passed");
         Integer timeSpent = parseInteger(body.get("timeSpent"));
         if (body.get("timeSpent") != null && timeSpent == null) {
             return Result.fail("用时格式错误");
+        }
+        if (timeSpent != null && timeSpent < 0) {
+            return Result.fail("用时不能为负数");
         }
         levelService.saveProgress(userId, levelId, score, Boolean.TRUE.equals(passed), timeSpent);
         Map<String, Object> suggestion = levelService.analyzePerformance(userId, levelId);

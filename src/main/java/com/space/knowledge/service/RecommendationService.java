@@ -127,7 +127,8 @@ public class RecommendationService {
             return Collections.emptyList();
         }
 
-        List<Map<String, Object>> candidateRows = attemptMapper.selectNeighborCorrectQuestionPairs(topNeighbors, new ArrayList<>(doneIds), 1000);
+        int candidateFetchLimit = Math.max(limit * 50, 500);
+        List<Map<String, Object>> candidateRows = attemptMapper.selectNeighborCorrectQuestionPairs(topNeighbors, new ArrayList<>(doneIds), candidateFetchLimit);
         if (candidateRows == null || candidateRows.isEmpty()) {
             return Collections.emptyList();
         }
@@ -179,7 +180,11 @@ public class RecommendationService {
     }
 
     private Set<Long> getDoneQuestionIds(Long userId) {
-        return new HashSet<>(attemptMapper.selectDistinctQuestionIdsByUser(userId));
+        List<Long> doneList = attemptMapper.selectDistinctQuestionIdsByUser(userId);
+        if (doneList == null || doneList.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(doneList);
     }
 
     private List<Long> getWrongQuestionIds(Long userId) {

@@ -143,8 +143,13 @@ public class LevelService {
         if (!questionIds.isEmpty()) {
             List<Map<String, Object>> rows = knowledgePointMapper.selectKpIdsByQuestionIds(questionIds.stream().collect(Collectors.toList()));
             for (Map<String, Object> row : rows) {
-                Long questionId = ((Number) row.get("question_id")).longValue();
-                Integer kpId = ((Number) row.get("kp_id")).intValue();
+                Object questionObj = row.get("questionId") != null ? row.get("questionId") : row.get("question_id");
+                Object kpObj = row.get("kpId") != null ? row.get("kpId") : row.get("kp_id");
+                if (!(questionObj instanceof Number) || !(kpObj instanceof Number)) {
+                    continue;
+                }
+                Long questionId = ((Number) questionObj).longValue();
+                Integer kpId = ((Number) kpObj).intValue();
                 questionKpMap.computeIfAbsent(questionId, k -> new java.util.ArrayList<>()).add(kpId);
             }
         }
