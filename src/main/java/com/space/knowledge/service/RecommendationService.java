@@ -1,9 +1,7 @@
 package com.space.knowledge.service;
 
 import com.space.knowledge.entity.Question;
-import com.space.knowledge.entity.User;
 import com.space.knowledge.entity.UserKpMastery;
-import com.space.knowledge.entity.Attempt;
 import com.space.knowledge.entity.WrongQuestion;
 import com.space.knowledge.mapper.AttemptMapper;
 import com.space.knowledge.mapper.QuestionMapper;
@@ -44,9 +42,14 @@ public class RecommendationService {
      * 今日推荐 / 练习推荐：优先错题、未做、与能力匹配难度
      */
     public List<Question> recommendForUser(Long userId, Integer gradeId, int limit) {
-        User user = new User();
-        user.setId(userId);
-        user.setGradeId(gradeId);
+        if (limit <= 0) {
+            return Collections.emptyList();
+        }
+        List<Question> cfRecommend = recommendQuestionsByCF(userId, limit);
+        if (!cfRecommend.isEmpty()) {
+            return cfRecommend;
+        }
+
         int suggestedDifficulty = suggestDifficulty(userId);
         Set<Long> doneIds = getDoneQuestionIds(userId);
         List<Long> wrongIds = getWrongQuestionIds(userId);
@@ -72,6 +75,96 @@ public class RecommendationService {
     }
 
     /**
+     * 协同过滤推荐（User-Based CF + 杰卡德相似系数）
+     * 1) 取目标学生已作答题集A
+     * 2) 找到与目标学生有共同作答的邻居学生B
+     * 3) 用 J(A,B)=|A∩B|/|A∪B| 计算相似度，选TopN邻居
+     * 4) 汇总邻居答对且目标学生未做过的题目，按频次与相似度加权排序
+     */
+    public List<Question> recommendQuestionsByCF(Long userId, int limit) {
+        if (limit <= 0) {
+            return Collections.emptyList();
+        }
+        Set<Long> doneIds = getDoneQuestionIds(userId);
+        if (doneIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Integer userQuestionCount = attemptMapper.countDistinctQuestionsByUser(userId);
+        if (userQuestionCount == null || userQuestionCount == 0) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> overlaps = attemptMapper.selectNeighborOverlap(userId, 30);
+        if (overlaps == null || overlaps.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, Double> neighborSimilarity = new HashMap<>();
+        for (Map<String, Object> row : overlaps) {
+            Long neighborId = ((Number) row.get("userId")).longValue();
+            int overlap = ((Number) row.get("overlap")).intValue();
+            Integer neighborQuestionCount = attemptMapper.countDistinctQuestionsByUser(neighborId);
+            if (neighborQuestionCount == null || neighborQuestionCount == 0) {
+                continue;
+            }
+            int union = userQuestionCount + neighborQuestionCount - overlap;
+            if (union <= 0) {
+                continue;
+            }
+            double jaccard = (double) overlap / union;
+            if (jaccard > 0) {
+                neighborSimilarity.put(neighborId, jaccard);
+            }
+        }
+
+        List<Long> topNeighbors = neighborSimilarity.entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                .limit(8)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        if (topNeighbors.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> candidateRows = attemptMapper.selectNeighborCorrectQuestionPairs(topNeighbors, new ArrayList<>(doneIds), 1000);
+        if (candidateRows == null || candidateRows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, Double> questionScore = new HashMap<>();
+        for (Map<String, Object> row : candidateRows) {
+            Long neighborId = ((Number) row.get("userId")).longValue();
+            Long questionId = ((Number) row.get("questionId")).longValue();
+            Double similarity = neighborSimilarity.get(neighborId);
+            if (similarity == null || similarity <= 0) {
+                continue;
+            }
+            questionScore.merge(questionId, similarity, Double::sum);
+        }
+        if (questionScore.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> candidateIds = questionScore.entrySet().stream()
+                .sorted((a, b) -> {
+                    int cmp = Double.compare(b.getValue(), a.getValue());
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                    return Long.compare(a.getKey(), b.getKey());
+                })
+                .map(Map.Entry::getKey)
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        return candidateIds.stream()
+                .map(id -> questionService.getByIdForAnswer(id))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 自适应难度：最近N题正确率与用时
      */
     public int suggestDifficulty(Long userId) {
@@ -86,9 +179,7 @@ public class RecommendationService {
     }
 
     private Set<Long> getDoneQuestionIds(Long userId) {
-        return attemptMapper.selectByUserId(userId, 500).stream()
-                .map(Attempt::getQuestionId)
-                .collect(Collectors.toSet());
+        return new HashSet<>(attemptMapper.selectDistinctQuestionIdsByUser(userId));
     }
 
     private List<Long> getWrongQuestionIds(Long userId) {
