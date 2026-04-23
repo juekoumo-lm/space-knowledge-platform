@@ -13,6 +13,8 @@
 
 ## 快速开始
 
+> 需要更详细的部署/排障文档请看：`docs/RUNBOOK.md`
+
 ### 1. 数据库
 
 ```bash
@@ -24,12 +26,45 @@ mysql -u root -p < src/main/resources/db/schema.sql
 ### 2. 构建与运行
 
 ```bash
-mvn clean package cargo:run
+mvn clean package
+mvn -DskipTests jetty:run
 ```
 
-（使用 Cargo + Tomcat 9，默认端口 **8081**。若 8081 被占用，可在 `pom.xml` 中修改 `cargo.servlet.port`。）
+（默认使用 Jetty 插件启动，端口 **8081**。若 8081 被占用，可在 `pom.xml` 中修改 `jetty-maven-plugin` 的端口配置。）
 
 或将 `target/space-knowledge.war` 部署到独立 Tomcat，或使用 IDE 以 War 形式部署，端口通常为 8080。
+
+### 2.1 启动后快速自检（防止 403 / 路由错误）
+
+```bash
+bash scripts/deploy_smoke_check.sh
+```
+
+该脚本会自动：
+- 打包项目；
+- 启动 Jetty；
+- 检查首页与登录页是否 200；
+- 检查匿名访问受保护接口时是否返回“用户未登录”（而不是 403/404 异常）。
+
+### 2.2 数据初始化与登录接口自检
+
+```bash
+# 初始化 schema + 演示数据
+bash scripts/init_demo_db.sh -u root -p'你的密码'
+
+# 启动项目后检查登录与学生接口
+bash scripts/api_auth_smoke.sh
+```
+
+### 2.3 一键预检（升级版）
+
+```bash
+bash scripts/full_preflight.sh
+# 无数据库或未导入演示账号时可先跳过鉴权检查
+bash scripts/full_preflight.sh --skip-auth
+```
+
+会按顺序执行：`compile -> test -> deploy_smoke -> api_auth_smoke`。
 
 ### 3. 访问
 

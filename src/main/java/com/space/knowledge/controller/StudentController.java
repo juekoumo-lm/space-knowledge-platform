@@ -34,7 +34,64 @@ public class StudentController {
     private com.space.knowledge.mapper.UserKpMasteryMapper userKpMasteryMapper;
 
     private Long userId(HttpServletRequest req) {
+        // userId 由 AuthInterceptor 在验签后写入 request attribute
         return (Long) req.getAttribute("userId");
+    }
+
+    /**
+     * 将任意对象安全转换为 Integer。
+     * 用于兼容前端 Number/String 两种传参格式，避免 ClassCastException。
+     */
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 将任意对象安全转换为 BigDecimal。
+     * score 等字段可能来自浮点、整型或字符串，统一走该方法做容错。
+     */
+    private java.math.BigDecimal parseBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return java.math.BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+        try {
+            return new java.math.BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Boolean 容错解析：支持 true/false 与 1/0。
+     */
+    private Boolean parseBoolean(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        String text = value.toString().trim().toLowerCase();
+        if ("true".equals(text) || "1".equals(text)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(text) || "0".equals(text)) {
+            return Boolean.FALSE;
+        }
+        return null;
     }
 
     @GetMapping("/levels")
@@ -209,7 +266,7 @@ public class StudentController {
     }
 
     @PostMapping("/level/{levelId}/complete")
-    public Result<Void> completeLevel(HttpServletRequest req, @PathVariable Integer levelId, @RequestBody Map<String, Object> body) {
+    public Result<Map<String, Object>> completeLevel(HttpServletRequest req, @PathVariable Integer levelId, @RequestBody Map<String, Object> body) {
         Long userId = userId(req);
         if (userId == null) {
             return Result.fail("用户未登录");
@@ -217,11 +274,31 @@ public class StudentController {
         if (levelId == null) {
             return Result.fail("关卡ID不能为空");
         }
-        Number scoreNum = (Number) body.get("score");
-        Boolean passed = (Boolean) body.get("passed");
-        Integer timeSpent = body.get("timeSpent") != null ? ((Number) body.get("timeSpent")).intValue() : null;
-        levelService.saveProgress(userId, levelId, scoreNum != null ? java.math.BigDecimal.valueOf(scoreNum.doubleValue()) : null, Boolean.TRUE.equals(passed), timeSpent);
-        return Result.ok(null);
+        // 关卡分数：允许前端传 number/string，但要校验范围
+        java.math.BigDecimal score = parseBigDecimal(body.get("score"));
+        if (body.get("score") != null && score == null) {
+            return Result.fail("分数格式错误");
+        }
+        if (score != null && (score.compareTo(java.math.BigDecimal.ZERO) < 0 || score.compareTo(new java.math.BigDecimal("100")) > 0)) {
+            return Result.fail("分数范围应为0-100");
+        }
+        // 通关标记：兼容 true/false、1/0
+        Boolean passed = parseBoolean(body.get("passed"));
+        if (body.get("passed") != null && passed == null) {
+            return Result.fail("通过标识格式错误");
+        }
+        // 用时：必须是非负整数
+        Integer timeSpent = parseInteger(body.get("timeSpent"));
+        if (body.get("timeSpent") != null && timeSpent == null) {
+            return Result.fail("用时格式错误");
+        }
+        if (timeSpent != null && timeSpent < 0) {
+            return Result.fail("用时不能为负数");
+        }
+        // 先落库，再给出“下一步建议”分析结果
+        levelService.saveProgress(userId, levelId, score, Boolean.TRUE.equals(passed), timeSpent);
+        Map<String, Object> suggestion = levelService.analyzePerformance(userId, levelId);
+        return Result.ok(suggestion);
     }
 
     @GetMapping("/recommend")

@@ -11,6 +11,14 @@
     <select id="selectById" resultMap="BaseResultMap">SELECT l.*, g.name as grade_name FROM levels l LEFT JOIN grades g ON l.grade_id=g.id WHERE l.id=#{id}</select>
     <select id="selectByGradeId" resultMap="BaseResultMap">SELECT l.*, g.name as grade_name FROM levels l LEFT JOIN grades g ON l.grade_id=g.id WHERE l.grade_id=#{gradeId} ORDER BY l.sort_order, l.id</select>
     <select id="selectQuestionIdsByLevelId" resultType="long">SELECT question_id FROM level_questions WHERE level_id=#{levelId}</select>
+    <select id="selectNextLevelId" resultType="int">
+        SELECT id
+        FROM levels
+        WHERE grade_id=#{gradeId}
+          AND (sort_order &gt; #{sortOrder} OR (sort_order = #{sortOrder} AND id &gt; #{currentId}))
+        ORDER BY sort_order ASC, id ASC
+        LIMIT 1
+    </select>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO levels (name, grade_id, theme, difficulty, required_kps, question_count, pass_score, sort_order)
         VALUES (#{name}, #{gradeId}, #{theme}, #{difficulty}, #{requiredKps}, #{questionCount}, #{passScore}, #{sortOrder})
