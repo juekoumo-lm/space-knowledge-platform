@@ -5,3 +5,4 @@ SOURCE src/main/resources/db/seed/00_reset_demo_data.sql;
 SOURCE src/main/resources/db/seed/01_demo_users_and_classes.sql;
 SOURCE src/main/resources/db/seed/02_demo_knowledge_questions_levels.sql;
 SOURCE src/main/resources/db/seed/03_demo_attempts_progress.sql;
+SOURCE src/main/resources/db/seed/04_demo_dashboard_heavy_data.sql;

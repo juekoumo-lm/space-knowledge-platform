@@ -8,6 +8,7 @@
 - `01_demo_users_and_classes.sql`：插入班级、老师学生账号、勋章定义。
 - `02_demo_knowledge_questions_levels.sql`：插入知识点、题目、选项、关卡和关卡题目池。
 - `03_demo_attempts_progress.sql`：插入答题记录、关卡进度、掌握度、错题、用户勋章。
+- `04_demo_dashboard_heavy_data.sql`：补充近30天练习数据，用于教师大屏活跃度、错题热力、排行榜等图表。
 - `99_bootstrap_demo.sql`：按顺序串联执行以上脚本（适合 MySQL 客户端一键导入）。
 
 ## 推荐执行顺序
@@ -16,6 +17,7 @@
 2. 执行 `01_demo_users_and_classes.sql`
 3. 执行 `02_demo_knowledge_questions_levels.sql`
 4. 执行 `03_demo_attempts_progress.sql`
+5. （推荐）执行 `04_demo_dashboard_heavy_data.sql`
 
 ## 演示账号
 
