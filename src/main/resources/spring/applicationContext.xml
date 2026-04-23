@@ -52,12 +52,10 @@
     </bean>
     
     <!-- Caching configuration -->
+    <bean id="cachingProvider" class="javax.cache.Caching" factory-method="getCachingProvider"/>
+    <bean id="jCacheManager" factory-bean="cachingProvider" factory-method="getCacheManager"/>
     <bean id="cacheManager" class="org.springframework.cache.jcache.JCacheCacheManager">
-        <property name="cacheManager">
-            <bean class="javax.cache.Caching" factory-method="getCachingProvider">
-                <method name="getCacheManager"/>
-            </bean>
-        </property>
+        <property name="cacheManager" ref="jCacheManager"/>
     </bean>
     <cache:annotation-driven cache-manager="cacheManager"/>
 </beans>

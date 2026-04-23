@@ -37,6 +37,51 @@ public class StudentController {
         return (Long) req.getAttribute("userId");
     }
 
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private java.math.BigDecimal parseBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return java.math.BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+        try {
+            return new java.math.BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Boolean parseBoolean(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        String text = value.toString().trim().toLowerCase();
+        if ("true".equals(text) || "1".equals(text)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(text) || "0".equals(text)) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
     @GetMapping("/levels")
     public Result<List<Level>> levels(HttpServletRequest req, @RequestParam Integer gradeId) {
         Long userId = userId(req);
@@ -209,7 +254,7 @@ public class StudentController {
     }
 
     @PostMapping("/level/{levelId}/complete")
-    public Result<Void> completeLevel(HttpServletRequest req, @PathVariable Integer levelId, @RequestBody Map<String, Object> body) {
+    public Result<Map<String, Object>> completeLevel(HttpServletRequest req, @PathVariable Integer levelId, @RequestBody Map<String, Object> body) {
         Long userId = userId(req);
         if (userId == null) {
             return Result.fail("用户未登录");
@@ -217,11 +262,27 @@ public class StudentController {
         if (levelId == null) {
             return Result.fail("关卡ID不能为空");
         }
-        Number scoreNum = (Number) body.get("score");
-        Boolean passed = (Boolean) body.get("passed");
-        Integer timeSpent = body.get("timeSpent") != null ? ((Number) body.get("timeSpent")).intValue() : null;
-        levelService.saveProgress(userId, levelId, scoreNum != null ? java.math.BigDecimal.valueOf(scoreNum.doubleValue()) : null, Boolean.TRUE.equals(passed), timeSpent);
-        return Result.ok(null);
+        java.math.BigDecimal score = parseBigDecimal(body.get("score"));
+        if (body.get("score") != null && score == null) {
+            return Result.fail("分数格式错误");
+        }
+        if (score != null && (score.compareTo(java.math.BigDecimal.ZERO) < 0 || score.compareTo(new java.math.BigDecimal("100")) > 0)) {
+            return Result.fail("分数范围应为0-100");
+        }
+        Boolean passed = parseBoolean(body.get("passed"));
+        if (body.get("passed") != null && passed == null) {
+            return Result.fail("通过标识格式错误");
+        }
+        Integer timeSpent = parseInteger(body.get("timeSpent"));
+        if (body.get("timeSpent") != null && timeSpent == null) {
+            return Result.fail("用时格式错误");
+        }
+        if (timeSpent != null && timeSpent < 0) {
+            return Result.fail("用时不能为负数");
+        }
+        levelService.saveProgress(userId, levelId, score, Boolean.TRUE.equals(passed), timeSpent);
+        Map<String, Object> suggestion = levelService.analyzePerformance(userId, levelId);
+        return Result.ok(suggestion);
     }
 
     @GetMapping("/recommend")
